@@ -1,6 +1,6 @@
 [*]
-charset = utf-8
-end_of_line = lf
+charset = shift_jis
+end_of_line = crlf
 indent_style = tab
 indent_size = 4
 
