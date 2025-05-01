@@ -1,0 +1,10 @@
+{
+	"cSpell.words": [
+		"perlin"
+	],
+	"Lua.diagnostics.globals": [
+		"obj",
+		"pointerSize",
+		"color"
+	]
+}
