@@ -6,5 +6,8 @@
 		"obj",
 		"pointerSize",
 		"color"
+	],
+	"editor.rulers": [
+		80,
 	]
 }
