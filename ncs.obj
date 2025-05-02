@@ -4,24 +4,54 @@
 --track3: Z, -10000, 10000 0, 0.01
 
 --dialog: 色/col, local color=0xffffff; サイズ, local pointerSize=8; 音声同期/chk, local audioReact=true;
-local DEBUG_MODE = false
 
 
---== Pre Processing ==--
+--== Pre Processing ==========================================================--
 obj.setfont ("MS UI Gothic", 50, 0, 0xffffff)
 obj.setoption ("drawtarget", "tempbuffer", obj.screen_w, obj.screen_h)
---====================--
+--============================================================================--
 
---== Parsing Variables ==--
+
+--== Import rikky_module =====================================================--
+package.cpath = package.cpath .. ";" .. obj.getinfo ("script_path"):match ("(.*\\).*\\") .. "?.dll"
+local bool, rikky_module = pcall (require, "rikky_module")
+
+if not bool then
+	obj.load ("<s100>require rikky_module!")
+	obj.draw()
+
+	return
+end
+--============================================================================--
+
+
+--== Parsing Variables =======================================================--
 local resolution = obj.track0
 local noiseAmplitude = obj.track1
 local noiseFrequency = obj.track2 * 0.001
 local noiseEvolution = obj.track3
 
-local fieldSize = obj.screen_w / 2
+local DEBUG_MODE = false
+
+local fieldSizeX = 800
+local fieldSizeY = fieldSizeX
+
+local currentFrame, totalFrame = rikky_module.getinfo ("frame")
+
+--** Audio Reacting **--
+
+local circleRadius = 800
+local circleReactMultiplier = 0.04
+--============================================================================--
 
 
---== 3D Perlin Noise Class ==--
+--== Functions ==--
+local function lerp (t, a, b)
+	return a + t * (b - a)
+end
+
+
+--== 3D Perlin Noise Class ===================================================--
 local PerlinNoise3D = {}
 
 function PerlinNoise3D.new()
@@ -146,38 +176,144 @@ function PerlinNoise3D.noise (self, x, y, z)
 end
 
 
+--== Spherical Projection Class ==============================================--
+--== └─ 3次元空間の点を球の表面に射影します
+
+local SphereProjector = {}
+SphereProjector.__index = SphereProjector
+
+-- コンストラクタ
+-- cx, cy, cz: 球の中心座標
+-- r: 半径
+function SphereProjector.new (cx, cy, cz, r)
+	assert(type(cx)=="number" and type(cy)=="number" and type(cz)=="number", "中心座標は数値で指定してください")
+	assert(type(r)=="number" and r>0, "半径は正の数で指定してください")
+
+	local self = setmetatable({}, SphereProjector)
+	self.cx, self.cy, self.cz = cx, cy, cz
+	self.r = r
+
+	return self
+end
+
+-- project メソッド
+-- x, y, z: 射影したい点の座標
+-- 戻り値: 球面上に射影された点の座標(px, py, pz)
+function SphereProjector.project (self, x, y, z)
+	local vx = x - self.cx
+	local vy = y - self.cy
+	local vz = z - self.cz
+	local len = math.sqrt(vx*vx + vy*vy + vz*vz)
+	if len == 0 then
+		error("射影点が中心と一致しています。方向が定義できません。")
+	end
+	local scale = self.r / len
+	local px = self.cx + vx * scale
+	local py = self.cy + vy * scale
+	local pz = self.cz + vz * scale
+	return px, py, pz
+end
+--============================================================================--
+
+
 --== Main Processing ==--
 --** Draw **--
-local fieldGap = fieldSize / (resolution - 1)
-local fieldCenter = fieldSize / 2
+local fieldGapX = fieldSizeX / (resolution - 1)
+local fieldGapY = fieldSizeY / (resolution - 1)
 
---** Generate Field **--
+local fieldCenterX = fieldSizeX / 2
+local fieldCenterY = fieldSizeY / 2
+
 local noiseDimensionOffset = 100
 local perlin = PerlinNoise3D.new()
 
-obj.load ("figure", "円", color, pointerSize)
+--** Noise Config **--
+local noiseFlowX, noiseFlowY, noiseFlowZ = 0, 0, 0
+noiseFlowY = noiseEvolution * 0.4
+noiseFlowZ = noiseEvolution
 
-for x = 0, resolution - 1 do
-	for y = 0, resolution - 1 do
-		local posX = x * fieldGap - fieldCenter
-		local posY = y * fieldGap - fieldCenter
-		local posZ = 0
 
-		local distX = noiseAmplitude * perlin.noise (perlin, noiseFrequency * x + noiseDimensionOffset, noiseFrequency * y,                        noiseFrequency * noiseEvolution)
-		local distY = noiseAmplitude * perlin.noise (perlin, noiseFrequency * x,                        noiseFrequency * y + noiseDimensionOffset, noiseFrequency * noiseEvolution)
-		local distZ = noiseAmplitude * perlin.noise (perlin, noiseFrequency * x,                        noiseFrequency * y,                        noiseFrequency * noiseEvolution + noiseDimensionOffset)
+local audioOffset = 0
+local startFrequency = 20
+local endFrequency = 400
 
-		obj.draw (
-			posX + distX,
-			posY + distY,
-			posZ + distZ
-		)
+local audioStrength = 0
+
+local width = 9
+for i = 1, width do
+	local spectrumBuffer = rikky_module.audiobuffer (currentFrame + audioOffset + i, "FOURIER", "absolute", "monaural", 1024, 3, { startFrequency, endFrequency })
+	for j = 1, #spectrumBuffer do
+		audioStrength = audioStrength + spectrumBuffer[j] / #spectrumBuffer / width
 	end
 end
 
+noiseAmplitude = (audioStrength * 0.01) * noiseAmplitude
+
+
+local startTimer, endTimer = 0, 0
+local sphericalProjector = SphereProjector.new (0, 0, 0, circleRadius * 0.5 + audioStrength * circleReactMultiplier)
+
+startTimer = os.clock()
+obj.load ("figure", "円", color, pointerSize)
+
+for xi = 0, resolution - 1 do
+	for yi = 0, resolution - 1 do
+		local x, y, z = 0, 0, 0
+
+		--** Generate Field **--
+		x = xi * fieldGapX - fieldCenterX
+		y = yi * fieldGapY - fieldCenterY
+
+		--** Distort with Noise **--
+		x = x + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseFlowX,           noiseFrequency * yi,                        noiseFrequency * noiseFlowZ + noiseDimensionOffset)
+		y = y + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi + noiseFlowY,           noiseFrequency * noiseFlowZ)
+		z = z + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi,                        noiseFrequency * yi + noiseDimensionOffset, noiseFrequency * noiseFlowZ)
+
+		--** Spherical Projection **--
+		local strength = 1
+		local distance = math.sqrt (x * x + y * y)
+
+		x, y, z = sphericalProjector.project (sphericalProjector, x, y, z)
+
+		if (distance <= circleRadius) then
+			-- local distanceX = (x / math.sqrt(x * x + z * z))
+			-- local distanceY = (y / math.sqrt(y * y + z * z))
+
+			-- x = lerp (strength, x, distanceX * (circleRadius * 0.5))
+			-- y = lerp (strength, y, distanceY * (circleRadius * 0.5))
+
+			-- local xx = x * math.cos (y / (circleRadius))
+			-- local yy = y * math.cos (x / (circleRadius * 0.5))
+
+			-- x, y = xx, yy
+
+			-- distance = math.sqrt (x * x + y * y)
+			-- local unitX = x / distance
+			-- local unitY = y / distance
+
+			-- x = lerp (strength, x, unitX * (circleRadius * 0.5))
+			-- y = lerp (strength, y, unitY * (circleRadius * 0.5))
+		end
+
+		-- local distance = x / radius
+		-- local radian = distance * (math.pi * 0.5)
+
+		-- x = math.cos (radian - math.pi * 0.5) * (radius * 0.766)
+
+		--** Draw **--
+		obj.draw (x, y, z)
+	end
+end
+endTimer = os.clock()
+
 --** Debugging **--
 if (DEBUG_MODE) then
-	obj.load ("text", perlin.noise(perlin, 1000.2, 100.4, 100.6) * 100, 0xffffff, 0)
+	obj.load ("figure", "円", 0xff8888, circleRadius, 2)
+	obj.draw()
+
+	local radian = lerp (0.5, -math.pi * 0.5, math.pi * 0.5)
+
+	obj.load ("text", endTimer - startTimer, 0xffffff, 0)
 	obj.draw()
 end
 
