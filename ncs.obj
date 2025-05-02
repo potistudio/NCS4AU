@@ -18,7 +18,27 @@ local noiseAmplitude = obj.track1
 local noiseFrequency = obj.track2 * 0.001
 local noiseEvolution = obj.track3
 
-local fieldSize = obj.screen_w / 2
+local fieldSizeX = obj.screen_w / 2 - 200
+local fieldSizeY = fieldSizeX
+
+
+--== Import rikky_module ==--
+package.cpath = package.cpath .. ";" .. obj.getinfo ("script_path"):match ("(.*\\).*\\") .. "?.dll"
+local bool, rikky_module = pcall (require, "rikky_module")
+
+if not bool then
+	obj.load ("<s100>require rikky_module!")
+	obj.draw()
+
+	return
+end
+--=========================--
+
+
+--== Functions ==--
+local function lerp (t, a, b)
+	return a + t * (b - a)
+end
 
 
 --== 3D Perlin Noise Class ==--
@@ -148,36 +168,68 @@ end
 
 --== Main Processing ==--
 --** Draw **--
-local fieldGap = fieldSize / (resolution - 1)
-local fieldCenter = fieldSize / 2
+local fieldGapX = fieldSizeX / (resolution - 1)
+local fieldGapY = fieldSizeY / (resolution - 1)
 
---** Generate Field **--
+local fieldCenterX = fieldSizeX / 2
+local fieldCenterY = fieldSizeY / 2
+
 local noiseDimensionOffset = 100
 local perlin = PerlinNoise3D.new()
 
+local currentFrame, totalFrame = rikky_module.getinfo ("frame")
+local audioOffset = 0
+local startFrequency = 20
+local endFrequency = 400
+
+local audioStrength = 0
+
+local width = 9
+for i = 1, width do
+	local spectrumBuffer = rikky_module.audiobuffer (currentFrame + audioOffset + i, "FOURIER", "absolute", "monaural", 1024, 3, { startFrequency, endFrequency })
+	for j = 1, #spectrumBuffer do
+		audioStrength = audioStrength + spectrumBuffer[j] / #spectrumBuffer / width
+	end
+end
+
+noiseAmplitude = (audioStrength * 0.01) * noiseAmplitude
+
 obj.load ("figure", "‰~", color, pointerSize)
 
-for x = 0, resolution - 1 do
-	for y = 0, resolution - 1 do
-		local posX = x * fieldGap - fieldCenter
-		local posY = y * fieldGap - fieldCenter
-		local posZ = 0
+for xi = 0, resolution - 1 do
+	for yi = 0, resolution - 1 do
+		--** Generate Field **--
+		local x, y, z = 0, 0, 0
 
-		local distX = noiseAmplitude * perlin.noise (perlin, noiseFrequency * x + noiseDimensionOffset, noiseFrequency * y,                        noiseFrequency * noiseEvolution)
-		local distY = noiseAmplitude * perlin.noise (perlin, noiseFrequency * x,                        noiseFrequency * y + noiseDimensionOffset, noiseFrequency * noiseEvolution)
-		local distZ = noiseAmplitude * perlin.noise (perlin, noiseFrequency * x,                        noiseFrequency * y,                        noiseFrequency * noiseEvolution + noiseDimensionOffset)
+		x = xi * fieldGapX - fieldCenterX
+		y = yi * fieldGapY - fieldCenterY
 
-		obj.draw (
-			posX + distX,
-			posY + distY,
-			posZ + distZ
-		)
+		x = x + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi,                        noiseFrequency * noiseEvolution)
+		y = y + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi,                        noiseFrequency * yi + noiseDimensionOffset, noiseFrequency * noiseEvolution)
+		z = z + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi,                        noiseFrequency * yi,                        noiseFrequency * noiseEvolution + noiseDimensionOffset)
+
+
+		--** Spherical Coordinates **--
+		-- local radius = obj.screen_w / 4
+		-- local strength = 1
+
+		-- local distance = math.sqrt (x * x + y * y)
+		-- local unitX = x / distance
+		-- local unitY = y / distance
+
+		-- if (distance <= radius) then
+		-- 	x = lerp (strength, x, unitX * radius)
+		-- 	y = lerp (strength, y, unitY * radius)
+		-- end
+
+
+		obj.draw (x, y, z)
 	end
 end
 
 --** Debugging **--
 if (DEBUG_MODE) then
-	obj.load ("text", perlin.noise(perlin, 1000.2, 100.4, 100.6) * 100, 0xffffff, 0)
+	obj.load ("text", audioStrength, 0xffffff, 0)
 	obj.draw()
 end
 
