@@ -7,7 +7,7 @@
 
 ![Thumbnail](THUMBNAIL.png)
 
-数々の有名楽曲をリリースしている、イギリスのレーベル『[NCS (NoCopyrightSounds)](https://www.youtube.com/nocopyrightsounds)』。  
+数々の有名楽曲をリリースしている、イギリスのEDMレーベル『[NCS (NoCopyrightSounds)](https://www.youtube.com/nocopyrightsounds)』。  
 彼らのYouTube動画に使用されているオーディオビジュアライザーを、AviUtlで再現できるスクリプトです。
 
 通常、このビジュアライザーは、Maxon社が開発しているプラグイン『Trapcode Form』を使用して作成されます。  
