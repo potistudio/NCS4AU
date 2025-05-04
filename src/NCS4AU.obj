@@ -1,13 +1,13 @@
---track0: 分割数, 0, 1000, 100, 1
---track1: 高さ, 0, 1000, 100, 0.01
---track2: 周期, 0, 1000, 40, 0.01
---track3: Z, -10000, 10000 0, 0.01
+--track0: 球サイズ, 0.00, 2160.00, 600.00
+--track1: 高さ, 0.00, 1000.00, 64.00
+--track2: 周期, 0.00, 200.00, 16.00
+--track3: Z, -10000.00, 10000.00, 0.00
 
---dialog: 色/col, local color=0xffffff; サイズ, local pointerSize=8; 音声同期/chk, local audioReact=true;
+--dialog: 色/col,local color=0xffffff;音声同期/chk,local isReactive=1;球変換/chk,local isSpherical=1;ノイズ/chk,local applyNoise=1;サイズ,local pointerSize=6;分割数,local resolution=64;強さ,local projectionFactor=1.0;サイズ感度,local radiusReactionMultiplier=0.3;ノイズ感度,local noiseReactionMultiplier=0.2;ノイズ変異,local noiseFlowSpeed={-0.2,-0.4,0.0};
 
 
 --== Pre Processing ==========================================================--
-obj.setfont ("MS UI Gothic", 50, 0, 0xffffff)
+obj.setfont ("MS UI Gothic", 100, 0, 0xffffff)
 obj.setoption ("drawtarget", "tempbuffer", obj.screen_w, obj.screen_h)
 --============================================================================--
 
@@ -17,7 +17,7 @@ package.cpath = package.cpath .. ";" .. obj.getinfo ("script_path"):match ("(.*\
 local bool, rikky_module = pcall (require, "rikky_module")
 
 if not bool then
-	obj.load ("<s100>require rikky_module!")
+	obj.load ("require rikky_module. please install it.")
 	obj.draw()
 
 	return
@@ -26,29 +26,61 @@ end
 
 
 --== Parsing Variables =======================================================--
-local resolution = obj.track0
+--** Constructions **--
+local DEBUG_MODE = false
+
+
+--** Info **--
+local currentFrame, totalFrame = rikky_module.getinfo ("frame")
+
+
+--** Base Mesh **--
+-- resolution
+
+local fieldSizeX, fieldSizeY = 800, 800
+
+
+--** Noise Field **--
+-- applyNoise
+
 local noiseAmplitude = obj.track1
 local noiseFrequency = obj.track2 * 0.001
 local noiseEvolution = obj.track3
 
-local DEBUG_MODE = false
+local noiseFlowSpeedX = noiseFlowSpeed[1] * 0.1
+local noiseFlowSpeedY = noiseFlowSpeed[2] * 0.1
 
-local fieldSizeX = 800
-local fieldSizeY = fieldSizeX
 
-local currentFrame, totalFrame = rikky_module.getinfo ("frame")
+--** Spherical Field **--
+-- isSpherical
+-- projectionFactor
+
+local sphereRadius = obj.track0
+local wrapBack = true
+
 
 --** Audio Reacting **--
+-- isReactive
+-- noiseReactionMultiplier
+radiusReactionMultiplier = radiusReactionMultiplier * 0.1
 
-local circleRadius = 800
-local circleReactMultiplier = 0.04
+local audioOffset = 4
+local audioDurationWidth = 9
+
+local startFrequency = 20
+local endFrequency = 400
 --============================================================================--
 
 
---== Functions ==--
+--== Utility Functions =======================================================--
 local function lerp (t, a, b)
 	return a + t * (b - a)
 end
+
+local function lerp3D (t, xa, ya, za, xb, yb, zb)
+	return lerp (t, xa, xb), lerp (t, ya, yb), lerp (t, za, zb)
+end
+--============================================================================--
 
 
 --== 3D Perlin Noise Class ===================================================--
@@ -104,10 +136,6 @@ function PerlinNoise3D.fade (t)
 	return t * t * t * (t * (t * 6 - 15) + 10)
 end
 
-function PerlinNoise3D.lerp (t, a, b)
-	return a + t * (b - a)
-end
-
 function PerlinNoise3D.grad (self, hash, x, y, z)
 	return self.dot_product[bit.band(hash, 0xF)](x, y, z)
 end
@@ -151,73 +179,82 @@ function PerlinNoise3D.noise (self, x, y, z)
     BBB = p[ BB+1 ]
 
 	-- Take the weighted average between all 8 unit cube coordinates
-    return self.lerp (w,
-        self.lerp (v,
-            self.lerp (u,
+    return lerp (w,
+        lerp (v,
+            lerp (u,
                 self.grad (self, AAA, x, y, z),
                 self.grad (self, BAA, x - 1, y, z)
             ),
-            self.lerp (u,
+            lerp (u,
                 self.grad (self, ABA, x, y - 1, z),
                 self.grad (self, BBA, x - 1, y - 1, z)
             )
         ),
-        self.lerp (v,
-            self.lerp (u,
+        lerp (v,
+            lerp (u,
                 self.grad (self, AAB, x, y, z - 1),
 				self.grad (self, BAB, x - 1, y, z - 1)
             ),
-            self.lerp (u,
+            lerp (u,
                 self.grad (self, ABB, x, y - 1, z - 1),
 				self.grad (self, BBB, x - 1, y - 1, z - 1)
             )
 		)
     )
 end
+--============================================================================--
 
 
 --== Spherical Projection Class ==============================================--
 --== └─ 3次元空間の点を球の表面に射影します
-
 local SphereProjector = {}
 SphereProjector.__index = SphereProjector
 
--- コンストラクタ
--- cx, cy, cz: 球の中心座標
--- r: 半径
+---Constructor
+---@param cx number
+---@param cy number
+---@param cz number
+---@param r number
+---@return table
 function SphereProjector.new (cx, cy, cz, r)
-	assert(type(cx)=="number" and type(cy)=="number" and type(cz)=="number", "中心座標は数値で指定してください")
-	assert(type(r)=="number" and r>0, "半径は正の数で指定してください")
-
-	local self = setmetatable({}, SphereProjector)
+	local self = setmetatable ({}, SphereProjector)
 	self.cx, self.cy, self.cz = cx, cy, cz
 	self.r = r
 
 	return self
 end
 
--- project メソッド
+---Projection
 -- x, y, z: 射影したい点の座標
 -- 戻り値: 球面上に射影された点の座標(px, py, pz)
-function SphereProjector.project (self, x, y, z)
-	local vx = x - self.cx
-	local vy = y - self.cy
-	local vz = z - self.cz
-	local len = math.sqrt(vx*vx + vy*vy + vz*vz)
-	if len == 0 then
-		error("射影点が中心と一致しています。方向が定義できません。")
-	end
+---@param self table
+---@param fx number
+---@param fy number
+---@param fz number
+---@return number
+---@return number
+---@return number
+function SphereProjector.project (self, fx, fy, fz)
+	local vx = fx - self.cx
+	local vy = fy - self.cy
+	local vz = fz - self.cz
+	local len = math.sqrt (vx * vx + vy * vy + vz * vz)
+
 	local scale = self.r / len
 	local px = self.cx + vx * scale
 	local py = self.cy + vy * scale
 	local pz = self.cz + vz * scale
+
+	if (wrapBack) then
+		pz = math.abs (pz)
+	end
+
 	return px, py, pz
 end
 --============================================================================--
 
 
---== Main Processing ==--
---** Draw **--
+--== Main Processing =========================================================--
 local fieldGapX = fieldSizeX / (resolution - 1)
 local fieldGapY = fieldSizeY / (resolution - 1)
 
@@ -227,33 +264,33 @@ local fieldCenterY = fieldSizeY / 2
 local noiseDimensionOffset = 100
 local perlin = PerlinNoise3D.new()
 
---** Noise Config **--
-local noiseFlowX, noiseFlowY, noiseFlowZ = 0, 0, 0
-noiseFlowY = noiseEvolution * 0.4
-noiseFlowZ = noiseEvolution
 
-
-local audioOffset = 0
-local startFrequency = 20
-local endFrequency = 400
-
+--** Audio Sampling **--
 local audioStrength = 0
+if (isReactive == 1) then
+	for i = 1, audioDurationWidth do
+		local spectrumBuffer = rikky_module.audiobuffer (currentFrame + audioOffset + i, "FOURIER", "absolute", "monaural", 4096, 3, { startFrequency, endFrequency })
 
-local width = 9
-for i = 1, width do
-	local spectrumBuffer = rikky_module.audiobuffer (currentFrame + audioOffset + i, "FOURIER", "absolute", "monaural", 1024, 3, { startFrequency, endFrequency })
-	for j = 1, #spectrumBuffer do
-		audioStrength = audioStrength + spectrumBuffer[j] / #spectrumBuffer / width
+		for j = 1, #spectrumBuffer do
+			audioStrength = audioStrength + spectrumBuffer[j] / #spectrumBuffer / audioDurationWidth
+		end
 	end
 end
 
-noiseAmplitude = (audioStrength * 0.01) * noiseAmplitude
+
+local noiseFlowX = currentFrame * -noiseFlowSpeedX
+local noiseFlowY = currentFrame * noiseFlowSpeedY
+local noiseFlowZ = noiseEvolution
+
+noiseAmplitude = noiseAmplitude + (audioStrength * noiseReactionMultiplier)
+
+local sphericalProjector
+if (isSpherical == 1 and projectionFactor > 0) then
+	sphericalProjector = SphereProjector.new (0, 0, 0, sphereRadius * 0.5 + audioStrength * radiusReactionMultiplier)
+end
 
 
-local startTimer, endTimer = 0, 0
-local sphericalProjector = SphereProjector.new (0, 0, 0, circleRadius * 0.5 + audioStrength * circleReactMultiplier)
-
-startTimer = os.clock()
+--** Draw Mesh **--
 obj.load ("figure", "円", color, pointerSize)
 
 for xi = 0, resolution - 1 do
@@ -264,60 +301,46 @@ for xi = 0, resolution - 1 do
 		x = xi * fieldGapX - fieldCenterX
 		y = yi * fieldGapY - fieldCenterY
 
+
 		--** Distort with Noise **--
-		x = x + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseFlowX,           noiseFrequency * yi,                        noiseFrequency * noiseFlowZ + noiseDimensionOffset)
-		y = y + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi + noiseFlowY,           noiseFrequency * noiseFlowZ)
-		z = z + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi,                        noiseFrequency * yi + noiseDimensionOffset, noiseFrequency * noiseFlowZ)
-
-		--** Spherical Projection **--
-		local strength = 1
-		local distance = math.sqrt (x * x + y * y)
-
-		x, y, z = sphericalProjector.project (sphericalProjector, x, y, z)
-
-		if (distance <= circleRadius) then
-			-- local distanceX = (x / math.sqrt(x * x + z * z))
-			-- local distanceY = (y / math.sqrt(y * y + z * z))
-
-			-- x = lerp (strength, x, distanceX * (circleRadius * 0.5))
-			-- y = lerp (strength, y, distanceY * (circleRadius * 0.5))
-
-			-- local xx = x * math.cos (y / (circleRadius))
-			-- local yy = y * math.cos (x / (circleRadius * 0.5))
-
-			-- x, y = xx, yy
-
-			-- distance = math.sqrt (x * x + y * y)
-			-- local unitX = x / distance
-			-- local unitY = y / distance
-
-			-- x = lerp (strength, x, unitX * (circleRadius * 0.5))
-			-- y = lerp (strength, y, unitY * (circleRadius * 0.5))
+		if (applyNoise == 1) then
+			x = x + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseFlowX,           noiseFrequency * yi,                        noiseFrequency * noiseFlowZ + noiseDimensionOffset)
+			y = y + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi + noiseFlowY,           noiseFrequency * noiseFlowZ)
+			z = z + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi,                        noiseFrequency * yi + noiseDimensionOffset, noiseFrequency * noiseFlowZ)
 		end
 
-		-- local distance = x / radius
-		-- local radian = distance * (math.pi * 0.5)
 
-		-- x = math.cos (radian - math.pi * 0.5) * (radius * 0.766)
+		--** Spherical Projection **--
+		if (sphericalProjector) then
+			local sx, sy, sz = sphericalProjector.project (sphericalProjector, x, y, z)
+			x, y, z = lerp3D (projectionFactor, x, y, z, sx, sy, sz)
+		end
+
 
 		--** Draw **--
 		obj.draw (x, y, z)
 	end
 end
-endTimer = os.clock()
+--============================================================================--
 
---** Debugging **--
+
+--== Debugging ===============================================================--
 if (DEBUG_MODE) then
-	obj.load ("figure", "円", 0xff8888, circleRadius, 2)
+	--** Sphere Size Guide **--
+	obj.load ("figure", "円", 0xff8888, sphereRadius, 2)
 	obj.draw()
 
+	--** R&D **--
 	local radian = lerp (0.5, -math.pi * 0.5, math.pi * 0.5)
 
-	obj.load ("text", endTimer - startTimer, 0xffffff, 0)
+	--** Debug Text **--
+	obj.load ("text", radian, 0xffffff, 0)
 	obj.draw()
 end
+--============================================================================--
 
 
---== Post Processing ==--
+--== Post Processing =========================================================--
 obj.load ("tempbuffer")
 obj.effect()
+--============================================================================--
