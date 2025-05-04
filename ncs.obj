@@ -1,9 +1,9 @@
---track0: 分割数, 0, 1000, 100, 1
+--track0: 球サイズ, 0.00, 2000.00, 800.00, 0.01
 --track1: 高さ, 0, 1000, 160, 0.01
 --track2: 周期, 0, 1000, 40, 0.01
 --track3: Z, -10000, 10000 0, 0.01
 
---dialog: 色/col, local color=0xffffff; サイズ, local pointerSize=8; 分割数, local resolution=64; 音声同期/chk, local isReactive=true; 裏を折りたたむ/chk, local wrapBack=true;
+--dialog: 色/col,local color=0xffffff;音声同期/chk,local isReactive=1;球変換/chk,local isSpherical=1;ノイズ/chk,local applyNoise=1;サイズ,local pointerSize=8;分割数,local resolution=64;強さ,local projectionFactor=1.0;サイズ感度,local radiusReactionMultiplier=0.3;ノイズ感度,local noiseReactionMultiplier=0.2;ノイズ変異,local noiseFlowSpeed={-0.2,-0.6,0.0};
 
 
 --== Pre Processing ==========================================================--
@@ -30,45 +30,45 @@ end
 local DEBUG_MODE = false
 
 
---** Global **--
+--** Info **--
 local currentFrame, totalFrame = rikky_module.getinfo ("frame")
 
 
---** Plane Field **--
--- local resolution = obj.track0
-local fieldSizeX = 800
-local fieldSizeY = fieldSizeX
+--** Base Mesh **--
+-- resolution
+
+local fieldSizeX, fieldSizeY = 800, 800
 
 
---** Noise **--
-local applyNoise = true
+--** Noise Field **--
+-- applyNoise
 
-local noiseAmplitude = obj.track1 * 0.1
+local noiseAmplitude = obj.track1
 local noiseFrequency = obj.track2 * 0.001
 local noiseEvolution = obj.track3
 
-local noiseFlowSpeedX = 0.02
-local noiseFlowSpeedY = 0.04
+local noiseFlowSpeedX = noiseFlowSpeed[1] * 0.1
+local noiseFlowSpeedY = noiseFlowSpeed[2] * 0.1
 
 
 --** Spherical Field **--
-local isSpherical = true
--- local wrapBack = true
+-- isSpherical
+-- projectionFactor
 
-local sphereRadius = 600
-local projectionFactor = 1.04
+local sphereRadius = obj.track0
+local wrapBack = true
 
 
 --** Audio Reacting **--
--- local isReactive = false
+-- isReactive
+-- noiseReactionMultiplier
+radiusReactionMultiplier = radiusReactionMultiplier * 0.1
 
 local audioOffset = 4
-local audioDurationWidth = 9
+local audioDurationWidth = 11
 
-local startFrequency = 40
+local startFrequency = 20
 local endFrequency = 400
-
-local radiusReactionMultiplier = 0.04
 --============================================================================--
 
 
@@ -205,11 +205,10 @@ end
 --============================================================================--
 
 
---== Spherical Projection Class
+--== Spherical Projection Class ==============================================--
 --== └─ 3次元空間の点を球の表面に射影します
 local SphereProjector = {}
 SphereProjector.__index = SphereProjector
-
 
 ---Constructor
 ---@param cx number
@@ -218,9 +217,6 @@ SphereProjector.__index = SphereProjector
 ---@param r number
 ---@return table
 function SphereProjector.new (cx, cy, cz, r)
-	assert (type(cx)=="number" and type(cy)=="number" and type(cz)=="number", "中心座標は数値で指定してください")
-	assert (type(r)=="number" and r>0, "半径は正の数で指定してください")
-
 	local self = setmetatable ({}, SphereProjector)
 	self.cx, self.cy, self.cz = cx, cy, cz
 	self.r = r
@@ -228,10 +224,9 @@ function SphereProjector.new (cx, cy, cz, r)
 	return self
 end
 
--- project メソッド
+---Projection
 -- x, y, z: 射影したい点の座標
 -- 戻り値: 球面上に射影された点の座標(px, py, pz)
----Projection
 ---@param self table
 ---@param fx number
 ---@param fy number
@@ -244,10 +239,6 @@ function SphereProjector.project (self, fx, fy, fz)
 	local vy = fy - self.cy
 	local vz = fz - self.cz
 	local len = math.sqrt (vx * vx + vy * vy + vz * vz)
-
-	if len == 0 then
-		error ("射影点が中心と一致しています。方向が定義できません。")
-	end
 
 	local scale = self.r / len
 	local px = self.cx + vx * scale
@@ -264,7 +255,6 @@ end
 
 
 --== Main Processing =========================================================--
---** Draw **--
 local fieldGapX = fieldSizeX / (resolution - 1)
 local fieldGapY = fieldSizeY / (resolution - 1)
 
@@ -277,8 +267,7 @@ local perlin = PerlinNoise3D.new()
 
 --** Audio Sampling **--
 local audioStrength = 0
-
-if (isReactive) then
+if (isReactive == 1) then
 	for i = 1, audioDurationWidth do
 		local spectrumBuffer = rikky_module.audiobuffer (currentFrame + audioOffset + i, "FOURIER", "absolute", "monaural", 4096, 3, { startFrequency, endFrequency })
 
@@ -289,20 +278,19 @@ if (isReactive) then
 end
 
 
-noiseAmplitude = (audioStrength * 0.01) * noiseAmplitude
-
 local noiseFlowX = currentFrame * -noiseFlowSpeedX
 local noiseFlowY = currentFrame * noiseFlowSpeedY
 local noiseFlowZ = noiseEvolution
 
-local startTimer, endTimer = 0, 0
-local sphericalProjector = nil
+noiseAmplitude = noiseAmplitude + (audioStrength * noiseReactionMultiplier)
 
-if (projectionFactor > 0) then
+local sphericalProjector
+if (isSpherical == 1 and projectionFactor > 0) then
 	sphericalProjector = SphereProjector.new (0, 0, 0, sphereRadius * 0.5 + audioStrength * radiusReactionMultiplier)
 end
 
-startTimer = os.clock()
+
+--** Draw Mesh **--
 obj.load ("figure", "円", color, pointerSize)
 
 for xi = 0, resolution - 1 do
@@ -313,68 +301,40 @@ for xi = 0, resolution - 1 do
 		x = xi * fieldGapX - fieldCenterX
 		y = yi * fieldGapY - fieldCenterY
 
+
 		--** Distort with Noise **--
-		if (applyNoise) then
+		if (applyNoise == 1) then
 			x = x + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseFlowX,           noiseFrequency * yi,                        noiseFrequency * noiseFlowZ + noiseDimensionOffset)
 			y = y + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi + noiseFlowY,           noiseFrequency * noiseFlowZ)
 			z = z + noiseAmplitude * perlin.noise (perlin, noiseFrequency * xi,                        noiseFrequency * yi + noiseDimensionOffset, noiseFrequency * noiseFlowZ)
 		end
 
-		--** Spherical Projection **--
-		local distance = math.sqrt (x * x + y * y)
 
+		--** Spherical Projection **--
 		if (sphericalProjector) then
 			local sx, sy, sz = sphericalProjector.project (sphericalProjector, x, y, z)
 			x, y, z = lerp3D (projectionFactor, x, y, z, sx, sy, sz)
 		end
 
 
-		--** R&D **-- TODO: remove
-		-- if (distance <= sphereRadius) then
-			-- local distanceX = (x / math.sqrt(x * x + z * z))
-			-- local distanceY = (y / math.sqrt(y * y + z * z))
-
-			-- x = lerp (strength, x, distanceX * (circleRadius * 0.5))
-			-- y = lerp (strength, y, distanceY * (circleRadius * 0.5))
-
-			-- local xx = x * math.cos (y / (circleRadius))
-			-- local yy = y * math.cos (x / (circleRadius * 0.5))
-
-			-- x, y = xx, yy
-
-			-- distance = math.sqrt (x * x + y * y)
-			-- local unitX = x / distance
-			-- local unitY = y / distance
-
-			-- x = lerp (strength, x, unitX * (circleRadius * 0.5))
-			-- y = lerp (strength, y, unitY * (circleRadius * 0.5))
-		-- end
-
-		-- local distance = x / radius
-		-- local radian = distance * (math.pi * 0.5)
-
-		-- x = math.cos (radian - math.pi * 0.5) * (radius * 0.766)
-
-
 		--** Draw **--
 		obj.draw (x, y, z)
 	end
 end
-endTimer = os.clock()
 --============================================================================--
 
 
 --== Debugging ===============================================================--
 if (DEBUG_MODE) then
 	--** Sphere Size Guide **--
-	-- obj.load ("figure", "円", 0xff8888, sphereRadius, 2)
-	-- obj.draw()
+	obj.load ("figure", "円", 0xff8888, sphereRadius, 2)
+	obj.draw()
 
 	--** R&D **--
-	-- local radian = lerp (0.5, -math.pi * 0.5, math.pi * 0.5)
+	local radian = lerp (0.5, -math.pi * 0.5, math.pi * 0.5)
 
 	--** Debug Text **--
-	obj.load ("text", endTimer - startTimer, 0xffffff, 0)
+	obj.load ("text", radian, 0xffffff, 0)
 	obj.draw()
 end
 --============================================================================--
