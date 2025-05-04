@@ -1,13 +1,13 @@
---track0: 球サイズ, 0.00, 2000.00, 800.00, 0.01
---track1: 高さ, 0, 1000, 160, 0.01
---track2: 周期, 0, 1000, 40, 0.01
---track3: Z, -10000, 10000 0, 0.01
+--track0: 球サイズ, 0.00, 2160.00, 600.00
+--track1: 高さ, 0.00, 1000.00, 64.00
+--track2: 周期, 0.00, 200.00, 16.00
+--track3: Z, -10000.00, 10000.00, 0.00
 
---dialog: 色/col,local color=0xffffff;音声同期/chk,local isReactive=1;球変換/chk,local isSpherical=1;ノイズ/chk,local applyNoise=1;サイズ,local pointerSize=8;分割数,local resolution=64;強さ,local projectionFactor=1.0;サイズ感度,local radiusReactionMultiplier=0.3;ノイズ感度,local noiseReactionMultiplier=0.2;ノイズ変異,local noiseFlowSpeed={-0.2,-0.6,0.0};
+--dialog: 色/col,local color=0xffffff;音声同期/chk,local isReactive=1;球変換/chk,local isSpherical=1;ノイズ/chk,local applyNoise=1;サイズ,local pointerSize=6;分割数,local resolution=64;強さ,local projectionFactor=1.0;サイズ感度,local radiusReactionMultiplier=0.3;ノイズ感度,local noiseReactionMultiplier=0.2;ノイズ変異,local noiseFlowSpeed={-0.2,-0.4,0.0};
 
 
 --== Pre Processing ==========================================================--
-obj.setfont ("MS UI Gothic", 50, 0, 0xffffff)
+obj.setfont ("MS UI Gothic", 100, 0, 0xffffff)
 obj.setoption ("drawtarget", "tempbuffer", obj.screen_w, obj.screen_h)
 --============================================================================--
 
@@ -17,7 +17,7 @@ package.cpath = package.cpath .. ";" .. obj.getinfo ("script_path"):match ("(.*\
 local bool, rikky_module = pcall (require, "rikky_module")
 
 if not bool then
-	obj.load ("<s100>require rikky_module!")
+	obj.load ("require rikky_module. please install it.")
 	obj.draw()
 
 	return
@@ -65,7 +65,7 @@ local wrapBack = true
 radiusReactionMultiplier = radiusReactionMultiplier * 0.1
 
 local audioOffset = 4
-local audioDurationWidth = 11
+local audioDurationWidth = 9
 
 local startFrequency = 20
 local endFrequency = 400
