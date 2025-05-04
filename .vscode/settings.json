@@ -3,9 +3,18 @@
 		"perlin"
 	],
 	"Lua.diagnostics.globals": [
+		"applyNoise",
+		"color",
+		"isReactive",
+		"isSpherical",
+		"noiseFlowSpeed",
+		"noiseReactionMultiplier",
 		"obj",
 		"pointerSize",
-		"color"
+		"projectionFactor",
+		"radiusReactionMultiplier",
+		"resolution",
+		"wrapBack",
 	],
 	"editor.rulers": [
 		80,
