@@ -1,9 +1,9 @@
 # NCS for AviUtl (カスタムオブジェクト)
 
-![GitHub License](https://img.shields.io/github/license/potistudio/NCS-for-AviUtl)
-![GitHub Last commit](https://img.shields.io/github/last-commit/potistudio/NCS-for-AviUtl)
-![GitHub Downloads](https://img.shields.io/github/downloads/potistudio/NCS-for-AviUtl/total)
-![GitHub Release](https://img.shields.io/github/v/release/potistudio/NCS-for-AviUtl)
+![GitHub License](https://img.shields.io/github/license/potistudio/NCS4AU)
+![GitHub Last commit](https://img.shields.io/github/last-commit/potistudio/NCS4AU)
+![GitHub Downloads](https://img.shields.io/github/downloads/potistudio/NCS4AU/total)
+![GitHub Release](https://img.shields.io/github/v/release/potistudio/NCS4AU)
 
 ![Thumbnail](THUMBNAIL.png)
 
