@@ -23,14 +23,21 @@
 > 彼らがあまりにも有名であるため、ここでは「NCS風」と表現させていただきます。
 
 > [!IMPORTANT]  
-> 実行には`rikky_module`が必要です。
+> 実行には`rikky_module`と`LuaJIT`が必要です。
 
 ## ダウンロード
 
-ダウンロードはそれぞれ下記URLから行えます。
+本体のダウンロードはこちらから行えます。
 
 - [NCS for AviUtl - Releases](https://github.com/potistudio/NCS4AU/releases/latest)
+
+### rikky_moduleについて
+
 - [rikky_module配布ページ | アマゾンっぽい](https://hazumurhythm.com/wev/amazon/?script=rikkymodulea2Z)
+
+### LuaJITについて
+
+- [LuaJIT/AviUtl | Scrapbox](https://scrapbox.io/aviutl/LuaJIT)
 
 ## インストール
 
