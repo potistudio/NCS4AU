@@ -1,5 +1,8 @@
 dist/
 
-# macOS
+# macOS dummy files
 .DS_Store
-__MACOSX
+Thumbs.db
+
+# VSCode config
+.vscode/*
