@@ -24,6 +24,11 @@ local noiseAmplitude     = obj.track1
 local noiseFrequency     = obj.track2
 local noiseEvolution     = obj.track3
 
+-- Convert hex color to RGB values to pass to the shader
+local r                  = bit.band(bit.rshift(color, 16), 0xFF) / 255.0
+local g                  = bit.band(bit.rshift(color, 8), 0xFF) / 255.0
+local b                  = bit.band(color, 0xFF) / 255.0
+
 local noiseFlowSpeedX    = noiseFlowSpeed[1] * 0.01
 local noiseFlowSpeedY    = noiseFlowSpeed[2] * 0.01
 
@@ -73,6 +78,7 @@ if GLShaderKit.isInitialized() then
 	GLShaderKit.setFloat("uTime", currentFrame)
 	GLShaderKit.setFloat("uAudioStrength", audioStrength)
 	GLShaderKit.setFloat("uPointSize", pointerSize)
+	GLShaderKit.setFloat("uColor", r, g, b)
 
 	GLShaderKit.draw("POINTS", data, screenWidth, screenHeight)
 

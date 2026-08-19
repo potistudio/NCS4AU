@@ -7,6 +7,7 @@ out vec2 TexCoord;
 uniform vec2  uScreenSize;          // 画面解像度 (width, height)
 uniform int   uResolution;          // 分割数
 uniform float uPointSize;           // 点サイズ
+uniform vec3  uColor;               // 点色
 uniform vec4  uTrackParams;         // (球サイズ, 高さ, 周期, Evolution)
 uniform float uProjectionFactor;    // 球投影
 uniform vec2  uReactionMultipliers; // (球サイズ感度, ノイズ感度)
@@ -117,5 +118,5 @@ void main() {
 	gl_PointSize = uPointSize;
 
 	TexCoord = vec2(float(xi), float(yi)) / float(uResolution - 1);
-	vColor = vec3(1.0);
+	vColor = vec3(uColor);
 }
