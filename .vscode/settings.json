@@ -1,7 +1,4 @@
 {
-	"cSpell.words": [
-		"perlin"
-	],
 	"Lua.diagnostics.globals": [
 		"applyNoise",
 		"color",
