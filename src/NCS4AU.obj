@@ -27,7 +27,7 @@ end
 
 --== Parsing Variables =======================================================--
 --** Constructions **--
-local DEBUG_MODE = false
+local DEBUG_MODE = true
 
 
 --** Info **--
@@ -257,6 +257,8 @@ end
 
 
 --== Main Processing =========================================================--
+local startTime = os.clock()
+
 local fieldGapX = fieldSizeX / (resolution - 1)
 local fieldGapY = fieldSizeY / (resolution - 1)
 
@@ -333,6 +335,8 @@ for xi = 0, resolution - 1 do
 		obj.draw(x, y, z)
 	end
 end
+
+local endTime = os.clock()
 --============================================================================--
 
 
@@ -342,12 +346,11 @@ if (DEBUG_MODE) then
 	obj.load("figure", "‰~", 0xff8888, sphereRadius, 2)
 	obj.draw()
 
-	--** R&D **--
-	local radian = lerp(0.5, -math.pi * 0.5, math.pi * 0.5)
-
-	--** Debug Text **--
-	obj.load("text", radian, 0xffffff, 0)
-	obj.draw()
+	-- Benchmark
+	obj.setfont("Inter", 32, 0, 0xffffff)
+	obj.load("text", "Processing Time: " .. string.format("%.2f", (endTime - startTime) * 1000) .. " ms",
+		0xffffff, 0)
+	obj.draw(-730, -508)
 end
 --============================================================================--
 
