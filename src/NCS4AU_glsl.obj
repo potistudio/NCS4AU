@@ -1,0 +1,88 @@
+--track0: 球サイズ, 0.00, 2160.00, 600.00
+--track1: 高さ, 0.00, 1000.00, 64.00
+--track2: 周期, 0.00, 200.00, 16.00
+--track3: Z, -10000.00, 10000.00, 0.00
+--dialog: 色/col,local color=0xffffff;音声同期/chk,local isReactive=1;球変換/chk,local isSpherical=1;ノイズ/chk,local applyNoise=1;サイズ,local pointerSize=4;分割数,local resolution=256;強さ,local projectionFactor=1.08;サイズ感度,local radiusReactionMultiplier=30;ノイズ感度,local noiseReactionMultiplier=10;ノイズ変異,local noiseFlowSpeed={0,-40,0};
+
+
+---- Pre Processing ------------------------------------------------------------
+obj.setfont("MS UI Gothic", 100, 0xffffff)
+obj.setoption("drawtarget", "tempbuffer", obj.screen_w, obj.screen_h)
+obj.load("tempbuffer")
+--------------------------------------------------------------------------------
+
+
+---- Import External Modules ---------------------------------------------------
+local GLShaderKit  = require "GLShaderKit"
+local rikky_module = require "rikky_module"
+--------------------------------------------------------------------------------
+
+
+---- Parce Tracks --------------------------------------------------------------
+local sphereRadius       = obj.track0
+local noiseAmplitude     = obj.track1
+local noiseFrequency     = obj.track2
+local noiseEvolution     = obj.track3
+
+local noiseFlowSpeedX    = noiseFlowSpeed[1] * 0.01
+local noiseFlowSpeedY    = noiseFlowSpeed[2] * 0.01
+
+noiseReactionMultiplier  = noiseReactionMultiplier * 0.01
+radiusReactionMultiplier = radiusReactionMultiplier * 0.01
+--------------------------------------------------------------------------------
+
+
+---- Audio Sampling ------------------------------------------------------------
+local currentFrame, totalFrame = rikky_module.getinfo("frame")
+local audioOffset              = 4
+local audioDurationWidth       = 7
+local startFrequency           = 20
+local endFrequency             = 400
+
+local audioStrength            = 0
+if (isReactive == 1) then
+	for i = 1, audioDurationWidth do
+		local spectrumBuffer = rikky_module.audiobuffer(currentFrame + audioOffset + i, "FOURIER", "absolute", "monaural",
+			4096, 3, { startFrequency, endFrequency })
+
+		for j = 1, #spectrumBuffer do
+			audioStrength = audioStrength + spectrumBuffer[j] / #spectrumBuffer / audioDurationWidth
+		end
+	end
+end
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+local shaderPath                      = obj.getinfo("script_path") .. "NCS4AU_glsl.frag"
+local data, screenWidth, screenHeight = obj.getpixeldata()
+
+if GLShaderKit.isInitialized() then
+	GLShaderKit.activate()
+
+	GLShaderKit.setShader(shaderPath)
+	GLShaderKit.setPointVertex(resolution * resolution)
+
+	GLShaderKit.setInt("uResolution", resolution)
+	GLShaderKit.setFloat("uScreenSize", screenWidth, screenHeight)
+	GLShaderKit.setFloat("uTrackParams", sphereRadius, noiseAmplitude, noiseFrequency, noiseEvolution)
+	GLShaderKit.setFloat("uProjectionFactor", projectionFactor)
+	GLShaderKit.setFloat("uReactionMultipliers", radiusReactionMultiplier, noiseReactionMultiplier)
+	GLShaderKit.setFloat("uNoiseFlowSpeed", noiseFlowSpeedX, noiseFlowSpeedY, 0.0)
+	GLShaderKit.setInt("uFlags", isReactive, isSpherical, applyNoise)
+	GLShaderKit.setFloat("uTime", currentFrame)
+	GLShaderKit.setFloat("uAudioStrength", audioStrength)
+	GLShaderKit.setFloat("uPointSize", pointerSize)
+
+	GLShaderKit.draw("POINTS", data, screenWidth, screenHeight)
+
+	GLShaderKit.deactivate()
+end
+
+obj.putpixeldata(data)
+--------------------------------------------------------------------------------
+
+
+---- Post Processing -----------------------------------------------------------
+obj.effect()
+--------------------------------------------------------------------------------
