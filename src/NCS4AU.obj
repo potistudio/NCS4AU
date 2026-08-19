@@ -310,17 +310,17 @@ for xi = 0, resolution - 1 do
 		--** Distort with Noise **--
 		if (applyNoise == 1) then
 			x = x +
-			noiseAmplitude *
-			perlin.noise(perlin, noiseFrequency * xi + noiseFlowX, noiseFrequency * yi,
-				noiseFrequency * noiseFlowZ + noiseDimensionOffset)
+				noiseAmplitude *
+				perlin.noise(perlin, noiseFrequency * xi + noiseFlowX, noiseFrequency * yi,
+					noiseFrequency * noiseFlowZ + noiseDimensionOffset)
 			y = y +
-			noiseAmplitude *
-			perlin.noise(perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi + noiseFlowY,
-				noiseFrequency * noiseFlowZ)
+				noiseAmplitude *
+				perlin.noise(perlin, noiseFrequency * xi + noiseDimensionOffset, noiseFrequency * yi + noiseFlowY,
+					noiseFrequency * noiseFlowZ)
 			z = z +
-			noiseAmplitude *
-			perlin.noise(perlin, noiseFrequency * xi, noiseFrequency * yi + noiseDimensionOffset,
-				noiseFrequency * noiseFlowZ)
+				noiseAmplitude *
+				perlin.noise(perlin, noiseFrequency * xi, noiseFrequency * yi + noiseDimensionOffset,
+					noiseFrequency * noiseFlowZ)
 		end
 
 
