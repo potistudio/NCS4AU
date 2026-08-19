@@ -25,7 +25,7 @@
 > 彼らがあまりにも有名であるため、ここでは「NCS風」と表現させていただきます。
 
 > [!IMPORTANT]  
-> 実行には`rikky_module`と`LuaJIT`が必要です。
+> 実行には `rikky_module`、`LuaJIT`、`GLShaderKit` が必要です。
 
 ## ダウンロード
 
@@ -40,6 +40,10 @@
 ### LuaJITについて
 
 - [LuaJIT/AviUtl | Scrapbox](https://scrapbox.io/aviutl/LuaJIT)
+
+### GLShaderKitについて
+
+- [karoterra/aviutl-GLShaderKit](https://github.com/karoterra/aviutl-GLShaderKit)
 
 ## インストール
 
